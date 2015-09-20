@@ -5,22 +5,68 @@ class phpcli
 	private $cols;
 	private $tokenised_text = array();
 	private $reset = "\033[0m";
+	private $zws = '';	// this has to be set in the __construct method, as chr() only works for ascii
 	private $formatted_message = array();
 	private $state_stack = array();	// this will hold the current formatting state of the text as a history, so when a state is closed, the previous can be reinstated
 
 	public function __construct()
 	{
+		$this->zws = $this->uchr(8203);	// set this to the zero width space character
+	
 		$this->check_dimensions();
 	}
 	
-	public function message($message, $append_newline=false)
+	public function message($message, $echo=false, $options=array() )
 	{
 		$message = $this->parse_html($message);
+		$message = implode('', $message);
 		
-		if($append_newline)
-			$message[] = "\n";
+		// if there are any extra customisation options for the text, run through them and do whatever needs doing
+		if(count($options) )
+		{
+			foreach($options as $opt => $value)
+			{
+				switch($opt)
+				{
+					case 'width':
+						$message = $this->fix_width($message, $value);
+						break;
+				}
+			}
+		}
 
-		return implode('', $message);
+		if($echo)
+			echo $message;
+		else
+			return $message;
+	}
+	
+	private function fix_width($message, $width)
+	{
+		//$words = explode(' ', $message);
+		$words = preg_split("/[ {$this->zws}]/", $message);
+		$lines = array();
+		
+		for($i=0; $i<count($words); $i++)
+		{
+			// first, check if any word is longer than the current box width and adjust it if necessary
+			if(strlen($words[$i]) > $width)
+				$width = strlen($words[$i]);
+		}
+		
+		for($i=0; $i<count($words); $i++)
+		{
+			if(isset($lines[count($lines)-1]) && (strlen($lines[count($lines)-1] . ' ' . $words[$i]) <= $width ) )
+				$lines[count($lines)-1] .= " {$words[$i]}";
+			else
+				$lines[] = $words[$i];
+		}
+		if(count($lines))
+			$lines[0] = trim($lines[0]);
+		
+		$message = str_replace('  ', ' ', implode("\n", $lines) );
+		
+		return $message;
 	}
 	
 	private function parse_html($message)
@@ -68,7 +114,8 @@ class phpcli
 							array('background', $element['content']['background']),
 							array('foreground', $element['content']['color']),
 						),
-						$current_state
+						$current_state,
+						$this->zws
 					);
 					$reset = 0;
 					break;
@@ -84,7 +131,7 @@ class phpcli
 					if(!$current_state)
 						$this->formatted_message[] = $this->reset;
 					else
-						$this->formatted_message[] = $current_state->format_string;
+						$this->formatted_message[] = $this->zws . $current_state->format_string . $this->zws;
 					
 					$this->formatted_message[] = $element['content'];
 					
@@ -92,9 +139,7 @@ class phpcli
 			}
 		}
 		$this->formatted_message[] = $this->reset;
-		
-		echo "\n";
-		
+
 		return $this->formatted_message;
 	}
 	
@@ -129,6 +174,13 @@ class phpcli
 		$this->cols = intval(exec("tput cols") );
 		$this->rows = intval(exec("tput lines") );
 	}
+	
+	function uchr($code)
+	{
+		$str = html_entity_decode('&#'.$code.';',ENT_NOQUOTES,'UTF-8');
+		
+		return $str;
+	}
 }
 
 class state_stack
@@ -161,7 +213,7 @@ class state_stack
 	
 	public $format_string = "\033[0m";
 
-	public function __construct($new_state, $previous_state=null)
+	public function __construct($new_state, $previous_state=null, $zws='')
 	{
 		// the new state should build upon the previous
 		if($previous_state)
@@ -214,22 +266,21 @@ class state_stack
 				{
 					case 'bold':
 						if($this->bold)
-							$this->format_string .= "\033[1m";
+							$this->format_string .= "\033[1m{$zws}";
 						break;
 					case 'italic':
 						if($this->italic)
-							$this->format_string .= "\033[3m";
+							$this->format_string .= "\033[3m{$zws}";
 						break;
 					case 'underlined':
 						if($this->underlined)
-							$this->format_string .= "\033[4m";
+							$this->format_string .= "\033[4m{$zws}";
 						break;
 					case 'foreground':
 					case 'background':
 						$colour = $this->get_closest_colour($this->{$prop}, $prop);
 
-						$this->format_string .= "\033[{$colour}m";
-						//$this->format_string .= $colour;
+						$this->format_string .= "\033[{$colour}m{$zws}";
 						break;
 				}
 			}
