@@ -43,30 +43,53 @@ class phpcli
 	
 	private function fix_width($message, $width)
 	{
-		//$words = explode(' ', $message);
-		$words = preg_split("/[ {$this->zws}]/", $message);
-		$lines = array();
+		$words_raw = preg_split("/[ {$this->zws}]/", $message);
+		$lines = $words = array();
+		
+		// because of splitting the string on spaces and non-breaking spaces, there are some empty strings in the words list
+		foreach($words_raw as $word)
+		{
+			if(strlen($word) )
+				$words[] = $word;
+		}
 		
 		for($i=0; $i<count($words); $i++)
 		{
+			$escaped_word = $this->get_string_without_escapes($words[$i]);
 			// first, check if any word is longer than the current box width and adjust it if necessary
-			if(strlen($words[$i]) > $width)
-				$width = strlen($words[$i]);
+			if(strlen($escaped_word) > $width)
+				$width = strlen($escaped_word);
 		}
-		
+
 		for($i=0; $i<count($words); $i++)
 		{
-			if(isset($lines[count($lines)-1]) && (strlen($lines[count($lines)-1] . ' ' . $words[$i]) <= $width ) )
-				$lines[count($lines)-1] .= " {$words[$i]}";
-			else
-				$lines[] = $words[$i];
+			$escaped_word = $this->get_string_without_escapes($words[$i]);
+			
+			// determines if the previous word exists and was an actual word and not an escape sequence thereby requiring a space
+			$space = ($i && strlen($this->get_string_without_escapes($words[$i-1]) ) )?' ':'';
+
+			if(strlen($words[$i]) )
+			{
+				if(isset($lines[count($lines)-1]) && (strlen($lines[count($lines)-1] . ' ' . $escaped_word) <= $width ) )
+					$lines[count($lines)-1] .= "$space{$words[$i]}";
+				else
+					$lines[] = $words[$i];
+			}
 		}
+
 		if(count($lines))
 			$lines[0] = trim($lines[0]);
 		
 		$message = str_replace('  ', ' ', implode("\n", $lines) );
 		
 		return $message;
+	}
+	
+	private function get_string_without_escapes($escaped_string)
+	{
+		$clean_string = preg_replace("/\033(\[\d+m)/", '', $escaped_string);
+		
+		return $clean_string;
 	}
 	
 	private function parse_html($message)
