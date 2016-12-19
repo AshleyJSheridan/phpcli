@@ -38,7 +38,10 @@ class phpcli
 		}
 
 		if($echo)
+		{
+			$message = preg_replace("/$this->zws/", '', $message);
 			echo $message;
+		}
 		else
 			return $message;
 	}
