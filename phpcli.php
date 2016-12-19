@@ -18,6 +18,8 @@ class phpcli
 	
 	public function message($message, $echo=false, $options=array() )
 	{
+		$this->formatted_message = $this->tokenised_text = $this->state_stack = [];
+
 		$message = $this->parse_html($message);
 		$message = implode('', $message);
 		
