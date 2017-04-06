@@ -1,4 +1,4 @@
-#PHP CLI
+# PHP CLI
 
 This is a small class to help with the formatting of text output in PHP CLI scripts.
 
