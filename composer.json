@@ -1,0 +1,26 @@
+{
+  "name": "ashleyjsheridan/phpcli",
+  "type": "library",
+  "require": {
+	"php-di/php-di": "^6.0"
+  },
+  "require-dev": {
+	"phpunit/phpunit": "^6"
+  },
+  "license": "MIT",
+  "authors": [
+	{
+	  "name": "Ashley Sheridan",
+	  "email": "ash@ashleysheridan.co.uk"
+	}
+  ],
+  "autoload": {
+	"psr-4": {
+		"AshleyJSheridan\\PHPCli\\Controllers\\": "src/controllers",
+		"AshleyJSheridan\\PHPCli\\Helpers\\": "src/helpers",
+		"AshleyJSheridan\\PHPCli\\Entities\\": "src/entities",
+		"AshleyJSheridan\\PHPCli\\Renderers\\": "src/renderers",
+		"AshleyJSheridan\\PHPCli\\Exceptions\\": "src/exceptions"
+	}
+  }
+}

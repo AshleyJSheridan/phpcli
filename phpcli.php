@@ -3,146 +3,152 @@ class phpcli
 {
 	private $rows;
 	private $cols;
-	private $tokenised_text = array();
+	private $tokenisedText = [];
 	private $reset = "\033[0m";
-	private $zws = '';	// this has to be set in the __construct method, as chr() only works for ascii
-	private $formatted_message = array();
-	private $state_stack = array();	// this will hold the current formatting state of the text as a history, so when a state is closed, the previous can be reinstated
+	private $zws = '';	// this has to be set in the __construct method, as mb_chr() is not allowed here
+	private $formattedMessage = [];
+	private $stateStack = [];	// this will hold the current formatting state of the text as a history, so when a state is closed, the previous can be reinstated
 
 	public function __construct()
 	{
-		$this->zws = $this->uchr(8203);	// set this to the zero width space character
+		$this->zws = mb_chr(8203, 'UTF-8');
 	
-		$this->check_dimensions();
+		$this->checkDimensions();
 	}
 	
-	public function message($message, $echo=false, $options=array() )
+	public function message($message, $echo = false, $options = [])
 	{
-		$this->formatted_message = $this->tokenised_text = $this->state_stack = [];
+		$this->formattedMessage = $this->tokenisedText = $this->stateStack = [];
 
-		$message = $this->parse_html($message);
+		$message = $this->parseHtml($message);
 		$message = implode('', $message);
 		
 		// if there are any extra customisation options for the text, run through them and do whatever needs doing
-		if(count($options) )
+		if(count($options))
 		{
 			foreach($options as $opt => $value)
 			{
 				switch($opt)
 				{
 					case 'width':
-						$message = $this->fix_width($message, $value);
+						$message = $this->fixWidth($message, $value);
 						break;
 				}
 			}
 		}
 
-		if($echo)
-		{
-			$message = preg_replace("/$this->zws/", '', $message);
-			echo $message;
-		}
-		else
+		if(!$echo)
 			return $message;
+
+		echo preg_replace("/$this->zws/", '', $message);
 	}
 	
-	private function fix_width($message, $width)
+	private function fixWidth($message, $width)
 	{
-		$words_raw = preg_split("/[ {$this->zws}]/", $message);
-		$lines = $words = array();
+		$wordsRaw = preg_split("/[ {$this->zws}]/", $message);
+		$lines = $words = [];
 		
 		// because of splitting the string on spaces and non-breaking spaces, there are some empty strings in the words list
-		foreach($words_raw as $word)
+		foreach($wordsRaw as $word)
 		{
-			if(strlen($word) )
+			if(strlen($word))
+			{
 				$words[] = $word;
+			}
 		}
 		
-		for($i=0; $i<count($words); $i++)
+		for($i = 0; $i < count($words); $i ++)
 		{
-			$escaped_word = $this->get_string_without_escapes($words[$i]);
+			$escapedWord = $this->getStringWithoutEscapes($words[$i]);
+
 			// first, check if any word is longer than the current box width and adjust it if necessary
-			if(strlen($escaped_word) > $width)
-				$width = strlen($escaped_word);
+			if(strlen($escapedWord) > $width)
+			{
+				$width = strlen($escapedWord);
+			}
 		}
 
-		for($i=0; $i<count($words); $i++)
+		for($i = 0; $i < count($words); $i ++)
 		{
-			$escaped_word = $this->get_string_without_escapes($words[$i]);
+			$escapedWord = $this->getStringWithoutEscapes($words[$i]);
 			
 			// determines if the previous word exists and was an actual word and not an escape sequence thereby requiring a space
-			$space = ($i && strlen($this->get_string_without_escapes($words[$i-1]) ) )?' ':'';
+			$space = ($i && strlen($this->getStringWithoutEscapes($words[$i-1]) ) )?' ':'';
 
-			if(strlen($words[$i]) )
+			if(strlen($words[$i]))
 			{
-				if(isset($lines[count($lines)-1]) && (strlen($lines[count($lines)-1] . ' ' . $escaped_word) <= $width ) )
-					$lines[count($lines)-1] .= "$space{$words[$i]}";
+				if(isset($lines[count($lines)-1]) && (strlen("{$lines[count($lines)-1]} {$escapedWord}") <= $width ))
+				{
+					$lines[count($lines) - 1] .= "$space{$words[$i]}";
+				}
 				else
+				{
 					$lines[] = $words[$i];
+				}
 			}
 		}
 
 		if(count($lines))
+		{
 			$lines[0] = trim($lines[0]);
+		}
 		
-		$message = str_replace('  ', ' ', implode("\n", $lines) );
-		
-		return $message;
+		return str_replace('  ', ' ', implode("\n", $lines));
 	}
 	
-	private function get_string_without_escapes($escaped_string)
+	private function getStringWithoutEscapes($escapedString)
 	{
-		$clean_string = preg_replace("/\033(\[\d+m)/", '', $escaped_string);
+		$cleanString = preg_replace("/\033(\[\d+m)/", '', $escapedString);
 		
-		return $clean_string;
+		return $cleanString;
 	}
 	
-	private function parse_html($message)
+	private function parseHtml($message)
 	{
 		// convert the html message into a list of tokenised elements using domdocument
 		// unfortunately, I have to do this because the reset codes don't all work inside of the BASH shell
 		// particularly the bold one, which is likely to be one most used
 		$doc = new DOMDocument();
-		$doc->loadHTML("$message");
-		$this->get_dom_node($doc);
+		$doc->loadHTML($message);
+		$this->getDomNode($doc);
 
 		$reset = 0;
 		
-		foreach($this->tokenised_text as $element)
+		foreach($this->tokenisedText as $element)
 		{
-			$current_state = (count($this->state_stack) )?end($this->state_stack):null;
+			$currentState = (count($this->stateStack)) ? end($this->stateStack) : null;
 
 			switch($element['type'])
 			{
 				case 'b':
 				case 'strong':
-					$this->state_stack[] = new state_stack('bold', $current_state);
+					$this->stateStack[] = new stateStack('bold', $currentState);
 					$reset = 0;
 					break;
 				case 'i':
 				case 'em':
-					$this->state_stack[] = new state_stack('italic', $current_state);
+					$this->stateStack[] = new stateStack('italic', $currentState);
 					$reset = 0;
 					break;
 				case 'u':
-					$this->state_stack[] = new state_stack('underlined', $current_state);
+					$this->stateStack[] = new stateStack('underlined', $currentState);
 					$reset = 0;
 					break;
 				case 'foreground':
-					$this->state_stack[] = new state_stack(array('foreground', $element['content']), $current_state);
+					$this->stateStack[] = new stateStack(['foreground', $element['content']], $currentState);
 					$reset = 0;
 					break;
 				case 'background':
-					$this->state_stack[] = new state_stack(array('background', $element['content']), $current_state);
+					$this->stateStack[] = new stateStack(['background', $element['content']], $currentState);
 					$reset = 0;
 					break;
 				case 'foreback':
-					$this->state_stack[] = new state_stack(
-						array(
-							array('background', $element['content']['background']),
-							array('foreground', $element['content']['color']),
-						),
-						$current_state,
+					$this->stateStack[] = new stateStack(
+						[
+							['background', $element['content']['background']],
+							['foreground', $element['content']['color']],
+						],
+						$currentState,
 						$this->zws
 					);
 					$reset = 0;
@@ -152,66 +158,79 @@ class phpcli
 
 					if($reset > 1)
 					{
-						array_pop($this->state_stack);
-						$current_state = (count($this->state_stack) )?end($this->state_stack):null;
+						array_pop($this->stateStack);
+						$currentState = (count($this->stateStack) ) ? end($this->stateStack) : null;
 					}
 
-					if(!$current_state)
-						$this->formatted_message[] = $this->reset;
+					if(!$currentState)
+					{
+						$this->formattedMessage[] = $this->reset;
+					}
 					else
-						$this->formatted_message[] = $this->zws . $current_state->format_string . $this->zws;
+					{
+						$this->formattedMessage[] = "{$this->zws}{$currentState->formatString}{$this->zws}";
+					}
 					
-					$this->formatted_message[] = $element['content'];
+					$this->formattedMessage[] = $element['content'];
 					
 					break;
 			}
 		}
-		$this->formatted_message[] = $this->reset;
+		$this->formattedMessage[] = $this->reset;
 
-		return $this->formatted_message;
+		return $this->formattedMessage;
 	}
 	
-	private function get_dom_node(DOMNode $dom_node)
+	private function getDomNode(DOMNode $domNode)
 	{
-		foreach($dom_node->childNodes as $node)
+		foreach($domNode->childNodes as $node)
 		{
-			if(in_array($node->nodeName, array('b', 'strong', 'u', 'i', 'em', '#text') ) )
-				$this->tokenised_text[] = array('type'=>$node->nodeName, 'content'=>$node->nodeValue);
+			if(in_array($node->nodeName, ['b', 'strong', 'u', 'i', 'em', '#text']))
+			{
+				$this->tokenisedText[] = ['type' => $node->nodeName, 'content' => $node->nodeValue];
+			}
 			
-			if(in_array($node->nodeName, array('font') ) )
+			if(in_array($node->nodeName, ['font']))
 			{
 				if($node->hasAttribute('color') && $node->hasAttribute('background') )
-					$this->tokenised_text[] = array('type'=>'foreback', 'content'=>array('color'=>$node->getAttribute('color'), 'background'=>$node->getAttribute('background') ) );
+				{
+					$this->tokenisedText[] = [
+						'type' => 'foreback',
+						'content' => [
+							'color' => $node->getAttribute('color'),
+							'background' => $node->getAttribute('background')
+						]
+					];
+				}
 				else
 				{
-					if($node->hasAttribute('color') )
-						$this->tokenised_text[] = array('type'=>'foreground', 'content'=>$node->getAttribute('color') );
+					if($node->hasAttribute('color'))
+					{
+						$this->tokenisedText[] = ['type' => 'foreground', 'content' => $node->getAttribute('color')];
+					}
 						
-					if($node->hasAttribute('background') )
-						$this->tokenised_text[] = array('type'=>'background', 'content'=>$node->getAttribute('background') );
+					if($node->hasAttribute('background'))
+					{
+						$this->tokenisedText[] = ['type' => 'background', 'content' => $node->getAttribute('background')];
+					}
 				}
 			}
 
 			if($node->hasChildNodes() )
-				$this->get_dom_node ($node);
+			{
+				$this->getDomNode($node);
+			}
 		}
 	}
 	
-	private function check_dimensions()
+	private function checkDimensions()
 	{
 		$this->cols = intval(exec("tput cols") );
 		$this->rows = intval(exec("tput lines") );
 	}
-	
-	function uchr($code)
-	{
-		$str = html_entity_decode('&#'.$code.';',ENT_NOQUOTES,'UTF-8');
-		
-		return $str;
-	}
 }
 
-class state_stack
+class stateStack
 {
 	protected $bold = false;
 	protected $italic = false;
@@ -219,59 +238,63 @@ class state_stack
 	protected $foreground = null;
 	protected $background = null;
 	
-	private $colours = array(
-		30 => array(0,0,0),			// black
-		31 => array(128,0,0),		// red
-		32 => array(0,128,0),		// green
-		33 => array(128,128,0),		// yellow
-		34 => array(128,0,0),		// blue
-		35 => array(128,128,0),		// magenta
-		36 => array(0,128,128),		// cyan
-		37 => array(192,192,192),	// grey
+	private $colours = [
+		30 => [0, 0, 0],		// black
+		31 => [128, 0, 0],		// red
+		32 => [0, 128, 0],		// green
+		33 => [128, 128, 0],	// yellow
+		34 => [128, 0, 0],		// blue
+		35 => [128, 128, 0],	// magenta
+		36 => [0, 128, 128],	// cyan
+		37 => [192, 192, 192],	// grey
 		
-		90 => array(128,128,128),	// dark grey
-		91 => array(255,0,0),		// light red
-		92 => array(0,255,0),		// light green
-		93 => array(255,255,0),		// light yellow
-		94 => array(0,0,255),		// light blue
-		95 => array(255,255,0),		// light magenta
-		96 => array(0,255,255),		// light cyan
-		97 => array(255,255,255),	// white
-	);
+		90 => [128, 128, 128],	// dark grey
+		91 => [255, 0, 0],		// light red
+		92 => [0, 255, 0],		// light green
+		93 => [255, 255, 0],	// light yellow
+		94 => [0, 0, 255],		// light blue
+		95 => [255, 255, 0],	// light magenta
+		96 => [0, 255, 255],	// light cyan
+		97 => [255, 255, 255],	// white
+	];
 	
-	public $format_string = "\033[0m";
+	public $formatString = "\033[0m";
 
-	public function __construct($new_state, $previous_state=null, $zws='')
+	public function __construct($newState, $previousState = null, $zws = '')
 	{
 		// the new state should build upon the previous
-		if($previous_state)
+		if($previousState)
 		{
-			foreach($previous_state as $state => $value)
+			foreach($previousState as $state => $value)
+			{
 				$this->{$state} = $value;
+			}
 		}
 		
 		// simple state additions
-		if(is_string($new_state) && in_array($new_state, array('bold', 'italic', 'underlined') ) )
-			$this->{$new_state} = true;
+		if(is_string($newState) && in_array($newState, ['bold', 'italic', 'underlined']))
+		{
+			$this->{$newState} = true;
+		}
 			
 		// complex state additions
-		if(is_array($new_state))
+		if(is_array($newState))
 		{
-			if(is_string($new_state[0]) )
+			if(is_string($newState[0]))
 			{
-				switch($new_state[0])
+				switch($newState[0])
 				{
 					case 'foreground':
-						$this->foreground = $new_state[1];
+						$this->foreground = $newState[1];
 						break;
 					case 'background':
-						$this->background = $new_state[1];
+						$this->background = $newState[1];
 						break;
 				}
 			}
 			else
 			{
-				foreach($new_state as $state)
+				foreach($newState as $state)
 				{
 					switch($state[0])
 					{
@@ -294,51 +317,59 @@ class state_stack
 				{
 					case 'bold':
 						if($this->bold)
-							$this->format_string .= "\033[1m{$zws}";
+							$this->formatString .= "\033[1m{$zws}";
 						break;
 					case 'italic':
 						if($this->italic)
-							$this->format_string .= "\033[3m{$zws}";
+							$this->formatString .= "\033[3m{$zws}";
 						break;
 					case 'underlined':
 						if($this->underlined)
-							$this->format_string .= "\033[4m{$zws}";
+							$this->formatString .= "\033[4m{$zws}";
 						break;
 					case 'foreground':
 					case 'background':
-						$colour = $this->get_closest_colour($this->{$prop}, $prop);
+						$colour = $this->getClosestColour($this->{$prop}, $prop);
 
-						$this->format_string .= "\033[{$colour}m{$zws}";
+						$this->formatString .= "\033[{$colour}m{$zws}";
 						break;
 				}
 			}
 		}
 	}
 	
-	private function get_closest_colour($colour, $type='foreground')
+	private function getClosestColour($colour, $type = 'foreground')
 	{
 		if(strlen($colour) == 4)
-			$colour = '#' . substr($colour, 1, 1) . substr($colour, 1, 1) . substr($colour, 2, 1) . substr($colour, 2, 1) . substr($colour, 3, 1) . substr($colour, 3, 1);
+		{
+			$colour = '#'
+				. substr($colour, 1, 1)
+				. substr($colour, 1, 1)
+				. substr($colour, 2, 1)
+				. substr($colour, 2, 1)
+				. substr($colour, 3, 1)
+				. substr($colour, 3, 1);
+		}
 
 		list($r, $g, $b) = sscanf($colour, "#%2x%2x%2x");
    
-		$lowest_diff = 1000000;
-		$colour_index = null;
+		$lowestDiff = 1000000;
+		$colourIndex = null;
    
 		foreach($this->colours as $id => $colour)
 		{
-			$difference = sqrt(pow($r-$colour[0],2)+pow($g-$colour[1],2)+pow($b-$colour[2],2));
+			$difference = sqrt(pow($r - $colour[0],2) + pow($g - $colour[1],2) + pow($b - $colour[2],2));
 
-			if($difference < $lowest_diff)
+			if($difference < $lowestDiff)
 			{
-				$lowest_diff = $difference;
-				$colour_index = $id;
+				$lowestDiff = $difference;
+				$colourIndex = $id;
 			}
 		}
 		
 		if($type == 'foreground')
-			return $colour_index;
+			return $colourIndex;
 		else
-			return $colour_index + 10;	// background colours in the terminal are the same but with an index of 10 higher
+			return $colourIndex + 10;	// background colours in the terminal are the same but with an index of 10 higher
 	}
 }
