@@ -7,4 +7,9 @@ class HtmlTextNode extends HtmlNode
 	{
 		parent::__construct($content);
 	}
+
+	public function canOutput()
+	{
+		return true;
+	}
 }

@@ -7,4 +7,16 @@ class HtmlItalicNode extends HtmlNode
 	{
 		parent::__construct($content);
 	}
+
+	public function canFormat()
+	{
+		return true;
+	}
+
+	public function applyFormatToCurrentStackItem(OutputFormatStackItem $stackItem)
+	{
+		$stackItem->italic = true;
+
+		return $stackItem;
+	}
 }

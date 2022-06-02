@@ -7,4 +7,16 @@ class HtmlUnderlineNode extends HtmlNode
 	{
 		parent::__construct($content);
 	}
+
+	public function canFormat()
+	{
+		return true;
+	}
+
+	public function applyFormatToCurrentStackItem(OutputFormatStackItem $stackItem)
+	{
+		$stackItem->underlined = true;
+
+		return $stackItem;
+	}
 }

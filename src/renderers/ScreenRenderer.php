@@ -1,10 +1,7 @@
 <?php
 namespace AshleyJSheridan\PHPCli\Renderers;
 
-use AshleyJSheridan\PHPCli\Entities\HtmlBoldNode;
-use AshleyJSheridan\PHPCli\Entities\HtmlColourNode;
-use AshleyJSheridan\PHPCli\Entities\HtmlItalicNode;
-use AshleyJSheridan\PHPCli\Entities\HtmlUnderlineNode;
+use AshleyJSheridan\PHPCli\Entities\iHtmlNode;
 use AshleyJSheridan\PHPCli\Entities\OutputFormatStackItem;
 use AshleyJSheridan\PHPCli\Helpers\iColourHelper;
 
@@ -22,46 +19,28 @@ class ScreenRenderer implements iRenderer
 		$this->zws = mb_chr(8203, 'UTF-8');
 	}
 
-	public function setColour(HtmlColourNode $formatItem)
+	public function setFormatting(iHtmlNode $formatItem)
 	{
 		$stackItem = $this->getLastOrNewStackItem();
 
-		if(!is_null($formatItem->foreground))
-		{
-			$stackItem->foreground = $formatItem->foreground;
-		}
-		if(!is_null($formatItem->background))
-		{
-			$stackItem->background = $formatItem->background;
-		}
+		$stackItem = $formatItem->applyFormatToCurrentStackItem($stackItem);
 
 		$this->stack[] = $stackItem;
 	}
 
-	public function setBold(HtmlBoldNode $formatItem)
+	public function pushStackItem(OutputFormatStackItem $stackItem)
 	{
-		$stackItem = $this->getLastOrNewStackItem();
-		$stackItem->bold = true;
-		$this->stack[] = $stackItem;
-	}
-
-	public function setItalic(HtmlItalicNode $formatItem)
-	{
-		$stackItem = $this->getLastOrNewStackItem();
-		$stackItem->italic = true;
-		$this->stack[] = $stackItem;
-	}
-
-	public function setUnderlined(HtmlUnderlineNode $formatItem)
-	{
-		$stackItem = $this->getLastOrNewStackItem();
-		$stackItem->underlined = true;
 		$this->stack[] = $stackItem;
 	}
 
 	public function popStackItem()
 	{
 		array_pop($this->stack);
+	}
+
+	public function getStack()
+	{
+		return $this->stack;
 	}
 
 	public function outputStack($text)
@@ -100,7 +79,7 @@ class ScreenRenderer implements iRenderer
 		echo $content;
 	}
 
-	private function getLastOrNewStackItem()
+	public function getLastOrNewStackItem()
 	{
 		if(!isset($this->stack[count($this->stack) - 1]))
 		{

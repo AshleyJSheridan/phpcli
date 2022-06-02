@@ -10,67 +10,76 @@ use AshleyJSheridan\PHPCli\Entities\HtmlUnderlineNode;
 
 class HtmlHelper implements iHtmlHelper
 {
-	//private $tokenisedText = [];
-	//private $stateStack = [];
-
 	public function parseHtml($message)
 	{
-		// convert the html message into a list of tokenised elements using domdocument
-		// unfortunately, I have to do this because the reset codes don't all work inside of the BASH shell
-		// particularly the bold one, which is likely to be one most used
-		$doc = new \DOMDocument();
-		$doc->loadHTML($message);
+		$doc = $this->getDocument($message);
 
-		return $this->getDomNode($doc);
+		return $this->getDomNodes($doc);
 	}
 
-	public function getDomNode(\DOMNode $domNode)
+	public function getDomNodes(\DOMNode $domNode)
 	{
 		$tokenisedText = [];
 
-		foreach($domNode->childNodes as $childNode)
+		if($domNode->hasChildNodes())
 		{
-			$node = null;
-
-			switch($childNode->nodeName)
+			foreach ($domNode->childNodes as $childNode)
 			{
-				case '#text':
-					$node = new HtmlTextNode($childNode->nodeValue);
-					break;
-				case 'b':
-				case 'strong':
-					$node = new HtmlBoldNode($childNode->nodeValue);
-					break;
-				case 'u':
-					$node = new HtmlUnderlineNode($childNode->nodeValue);
-					break;
-				case 'i':
-				case 'em':
-					$node = new HtmlItalicNode($childNode->nodeValue);
-					break;
-				case 'font':
-					$node = new HtmlColourNode();
-					if($childNode->hasAttribute('color'))
-					{
-						$node->foreground = $childNode->getAttribute('color');
-					}
-					if($childNode->hasAttribute('background'))
-					{
-						$node->background = $childNode->getAttribute('background');
-					}
-					break;
-				default:
-					$node = new HtmlNode($childNode->nodeValue);
-			}
+				$node = $this->getNodeType($childNode);
 
-			if($childNode->hasChildNodes())
-			{
-				$node->children = $this->getDomNode($childNode);
-			}
+				if ($childNode->hasChildNodes())
+				{
+					$node->children = $this->getDomNodes($childNode);
+				}
 
-			$tokenisedText[] = $node;
+				$tokenisedText[] = $node;
+			}
 		}
 
 		return $tokenisedText;
+	}
+
+	public function getDocument($html)
+	{
+		$doc = new \DOMDocument();
+		$doc->loadHTML($html);
+
+		return $doc;
+	}
+
+	public function getNodeType($childNode)
+	{
+		switch ($childNode->nodeName)
+		{
+			case '#text':
+				$node = new HtmlTextNode($childNode->nodeValue);
+				break;
+			case 'b':
+			case 'strong':
+				$node = new HtmlBoldNode($childNode->nodeValue);
+				break;
+			case 'u':
+				$node = new HtmlUnderlineNode($childNode->nodeValue);
+				break;
+			case 'i':
+			case 'em':
+				$node = new HtmlItalicNode($childNode->nodeValue);
+				break;
+			case 'font':
+				$node = new HtmlColourNode();
+				if ($childNode->hasAttribute('color'))
+				{
+					$node->foreground = $childNode->getAttribute('color');
+				}
+				if ($childNode->hasAttribute('background'))
+				{
+					$node->background = $childNode->getAttribute('background');
+				}
+				break;
+			default:
+				$node = new HtmlNode($childNode->nodeValue);
+		}
+
+		return $node;
 	}
 }

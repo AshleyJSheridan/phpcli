@@ -22,10 +22,9 @@ class PHPCli
 		$this->screenDimensions = $this->screenHelper->getScreenDimensions();
 	}
 
-	public function message($message, $echo = false, $options = [])
+	public function message($message)
 	{
 		$messageTree = $this->htmlHelper->parseHtml($message);
-
 
 		$this->buildFormattedTree($messageTree);
 	}
@@ -40,30 +39,17 @@ class PHPCli
 
 	public function buildFormattedBranch(HtmlNode $branch)
 	{
-		$baseClassName =  substr(strrchr(get_class($branch), '\\'), 1);
-		$stackItemAfterChildren = false;
+		$popStackItemAfterOutputtingChildren = false;
 
-		switch($baseClassName)
+		if($branch->canFormat())
 		{
-			case 'HtmlColourNode':
-				$this->screenRenderer->setColour($branch);
-				$stackItemAfterChildren = 'remove colour formatting';
-				break;
-			case 'HtmlBoldNode':
-				$this->screenRenderer->setBold($branch);
-				$stackItemAfterChildren = 'remove bold formatting';
-				break;
-			case 'HtmlItalicNode':
-				$this->screenRenderer->setItalic($branch);
-				$stackItemAfterChildren = 'remove italic formatting';
-				break;
-			case 'HtmlUnderlineNode':
-				$this->screenRenderer->setUnderlined($branch);
-				$stackItemAfterChildren = 'remove underline formatting';
-				break;
-			case 'HtmlTextNode':
-				$this->screenRenderer->outputStack($branch->content);
-				break;
+			$this->screenRenderer->setFormatting($branch);
+			$popStackItemAfterOutputtingChildren = true;
+		}
+
+		if($branch->canOutput())
+		{
+			$this->screenRenderer->outputStack($branch->content);
 		}
 
 		if($branch->hasChildren())
@@ -71,7 +57,7 @@ class PHPCli
 			$this->buildFormattedTree($branch->children);
 		}
 
-		if($stackItemAfterChildren)
+		if($popStackItemAfterOutputtingChildren)
 		{
 			$this->screenRenderer->popStackItem();
 		}
